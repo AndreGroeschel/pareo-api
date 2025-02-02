@@ -1,0 +1,55 @@
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+line-length = 120
+indent-width = 4
+target-version = "py313"
+
+[lint]
+select = [
+  "E",   # Pycodestyle errors
+  "F",   # Pyflakes
+  "B",   # flake8-bugbear
+  "I",   # isort (import sorting)
+  "UP",  # pyupgrade
+  "C90", # mccabe complexity
+  "RUF", # Ruff-specific rules
+  "PYI", # Python type hints
+  "ANN", # flake8-annotations
+  "D",   # pydocstyle (docstrings)
+  "S",   # flake8-bandit (security)
+]
+
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

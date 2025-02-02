@@ -1,0 +1,33 @@
+[project]
+name = "pareo-api"
+version = "0.1.0"
+description = "API for Pareo"
+authors = [ {name = "André Gröschel", email = "andre@pareo.app"}]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "asyncpg>=0.30.0",
+    "crawl4ai>=0.4.247",
+    "loguru>=0.7.3",
+    "pre-commit>=4.0.1",
+    "pydantic-ai>=0.0.20",
+    "python-dotenv>=1.0.1",
+    "supabase>=2.12.0",
+    "openai>=1.60.1",
+    "pydantic-settings>=2.7.1",
+    "mypy>=1.14.1"
+]
+
+[dependency-groups]
+dev = [
+
+    "pre-commit>=4.0.1",
+    "ruff>=0.9.4",
+]
+lint = [
+    "ruff>=0.9.4",
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "pip"]
+build-backend = "setuptools.build_meta"
