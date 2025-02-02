@@ -8,38 +8,36 @@ provides type-safe access to configuration values.
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings with environment variable support.
-
-    Attributes:
-        app_name (str): The name of the application
-        environment (str): The current environment (development, staging, production)
-        debug (bool): Debug mode flag
-
-    """
+    """Application settings with environment variable support."""
 
     app_name: str = "My FastAPI App"
     environment: Literal["development", "staging", "production"] = "development"
     debug: bool = False
+    allowed_hosts: str = "*"  # Changed to str with default
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def parse_allowed_hosts(cls, v: str) -> list[str]:
+        """Parse allowed hosts env variable."""
+        if v == "*":
+            return ["*"]
+        return [host.strip() for host in v.split(",")]
 
     class Config:
         """Pydantic model config."""
 
         env_file = ".env"
-        case_sensitive = True
+        case_sensitive = False
 
 
 @lru_cache
 def get_settings() -> Settings:
-    """Create and cache application settings.
-
-    Returns:
-        Settings: Application settings instance
-
-    """
+    """Create and cache application settings."""
     return Settings()
 
 
