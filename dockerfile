@@ -5,6 +5,7 @@ WORKDIR /app
 ENV PYTHONPATH=/app/src
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV UV_LINK_MODE=copy
 
 # Install dependencies first (for better caching)
 COPY pyproject.toml .
@@ -29,11 +30,7 @@ ENV PORT=8000
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY ./src /app/src
-COPY .env /app/.env
-
-# Verify installation of uvicorn
-RUN which uvicorn
 
 EXPOSE $PORT
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${PORT}"]
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
