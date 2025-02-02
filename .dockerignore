@@ -1,0 +1,12 @@
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.git
+**/.github
+**/.vscode
+**/tests
+**/node_modules
+Dockerfile
+docker-compose.yml
+*.md
+*.log
