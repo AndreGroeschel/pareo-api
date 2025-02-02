@@ -15,12 +15,15 @@ dependencies = [
     "supabase>=2.12.0",
     "openai>=1.60.1",
     "pydantic-settings>=2.7.1",
-    "mypy>=1.14.1"
+    "mypy>=1.14.1",
+    "pydantic>=2.10.6",
+    "fastapi>=0.115.8",
+    "uvicorn>=0.34.0",
 ]
 
 [dependency-groups]
 dev = [
-
+    "httpx>=0.27.2",
     "pre-commit>=4.0.1",
     "ruff>=0.9.4",
 ]
