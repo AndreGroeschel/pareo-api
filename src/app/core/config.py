@@ -6,19 +6,30 @@ provides type-safe access to configuration values.
 """
 
 from functools import lru_cache
-from typing import Literal
 
-from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings with environment variable support."""
+    """Application settings with environment variable support.
 
-    app_name: str = "My FastAPI App"
-    environment: Literal["development", "staging", "production"] = "development"
-    debug: bool = False
-    allowed_hosts: str = "*"  # Changed to str with default
+    All settings must be provided via environment variables.
+    Missing required variables will raise a ValidationError.
+    """
+
+    # Define all required fields but without defaults
+    app_name: str = Field(default=...)
+    environment: str = Field(default=...)
+    debug: bool = Field(default=...)
+    allowed_hosts: str = Field(default=...)
+    supabase_url: str = Field(default=...)
+    supabase_key: str = Field(default=...)
+    openai_api_key: str = Field(default=...)
+    openrouter_api_key: str = Field(default=...)
+    openrouter_base_url: str = Field(default=...)
+    embedding_model: str = Field(default=...)
+    reasoning_model: str = Field(default=...)
 
     @field_validator("allowed_hosts")
     @classmethod
@@ -28,17 +39,18 @@ class Settings(BaseSettings):
             return ["*"]
         return [host.strip() for host in v.split(",")]
 
-    class Config:
-        """Pydantic model config."""
-
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env", case_sensitive=False, env_nested_delimiter="__", env_prefix="", extra="ignore"
+    )
 
 
 @lru_cache
 def get_settings() -> Settings:
     """Create and cache application settings."""
-    return Settings()
+    try:
+        return Settings()
+    except Exception as e:
+        raise ValueError("Missing required environment variables") from e
 
 
 settings = get_settings()
