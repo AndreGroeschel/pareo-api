@@ -12,7 +12,6 @@ dependencies = [
     "pre-commit>=4.0.1",
     "pydantic-ai>=0.0.20",
     "python-dotenv>=1.0.1",
-    "supabase>=2.12.0",
     "openai>=1.60.1",
     "pydantic-settings>=2.7.1",
     "mypy>=1.14.1",
@@ -21,6 +20,11 @@ dependencies = [
     "uvicorn>=0.34.0",
     "logfire>=3.4.0",
     "pyjwt[crypto]>=2.10.1",
+    "sqlalchemy>=2.0.38",
+    "psycopg2-binary>=2.9.10",
+    "pandas>=2.2.3",
+    "tqdm>=4.67.1",
+    "pgvector>=0.3.6",
 ]
 
 [dependency-groups]

@@ -37,5 +37,24 @@
   "python.testing.cwd": "${workspaceFolder}/tests",
   "python.testing.pytestPath": "${workspaceFolder}/.venv/bin/pytest",
   "python.testing.autoTestDiscoverOnSaveEnabled": true,
+  "cSpell.language": "en, python",
+  "cSpell.words": [
+    "kwargs",
+    "numexpr",
+    "dataframe",
+    "dataframes",
+    "strftime",
+    "unpickle",
+    "wildcard"
+  ],
+  "cSpell.ignorePaths": [
+    "**/venv/**",
+    "**/build/**",
+    "**/.vscode/**",
+    "**/sql/**",
+  ],
 
+  "cSpell.enabledFiletypes": ["python"],
+  "cSpell.checkDocStrings": true, // Spell-check docstrings
+  "cSpell.allowCompoundWords": true // For terms like "endpointURL"
 }
