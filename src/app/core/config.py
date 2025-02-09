@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = Field(default=...)
     embedding_model: str = Field(default=...)
     reasoning_model: str = Field(default=...)
+    clerk_pem_public_key: str = Field(default=...)
 
     @field_validator("allowed_hosts")
     @classmethod
