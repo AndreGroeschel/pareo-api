@@ -7,9 +7,11 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
-from supabase import Client
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from app.schemas.investor import CheckSize, CompanyContext, Investor
+from app.services.database_session_manager import DatabaseSessionManager
 
 
 class InvestorMatchResult(BaseModel):
@@ -28,29 +30,19 @@ class InvestorFinder:
         reasoning_model: OpenAIModel,
         openai_client: AsyncOpenAI,
         embedding_model_name: str,
+        db_session_manager: DatabaseSessionManager,
         max_tokens: int = 64000,
         retries: int = 3,
     ) -> None:
-        """Initialize the InvestorLeadsProcessor.
-
-        Args:
-            reasoning_model (str): Pydantic AI model to use for reasoning about investor match
-            openai_client: OpenAI client (for embeddings),
-            embedding_model_name (str): Name of the model to use for embeddings
-            max_tokens (int, optional): Maximum tokens per request. Defaults to 64000
-            retries (int, optional): Number of retry attempts for failed requests. Defaults to 3
-
-        Note:
-            The processor requires valid API credentials and will validate them during initialization.
-
-        """
+        """Initialize the InvestorLeadsProcessor with async database support."""
         logger.info("🚀 Initializing InvestorLeadsProcessor")
         try:
             self.openai_client = openai_client
             self.embedding_model_name = embedding_model_name
             self.agent = Agent(reasoning_model, retries=retries)
             self.max_tokens = max_tokens
-            logger.debug("Successfully initialized LLM processor")
+            self.session_manager = db_session_manager
+            logger.debug("Successfully initialized LLM and database components")
         except Exception as e:
             logger.error(f"Failed to initialize processor: {e!s}")
             raise
@@ -67,19 +59,61 @@ class InvestorFinder:
             logger.error(f"❌ Embedding generation failed: {e!s}")
             raise RuntimeError("Embedding generation failed") from e
 
+    async def get_investor_leads(
+        self, embedding: list[float], threshold: float, limit: int
+    ) -> list[InvestorMatchResult]:
+        """Retrieve and validate investor leads from the database."""
+        try:
+            logger.debug(f"Querying database with threshold {threshold}, limit {limit}")
+
+            # Convert embedding list to PostgreSQL vector string format
+            embedding_str = "[" + ",".join(map(str, embedding)) + "]"
+
+            async with self.session_manager.session() as session:
+                result = await session.execute(
+                    text("""
+                        SELECT * FROM get_investor_leads(
+                            CAST(:embedding AS vector(1536)),
+                            :threshold,
+                            :limit
+                        )
+                    """),
+                    {
+                        "embedding": embedding_str,  # Pass as string
+                        "threshold": threshold,
+                        "limit": limit,
+                    },
+                )
+
+                rows = result.mappings().all()
+                logger.info(f"🔍 Found {len(rows)} potential investors")
+                return self._validate_investors([dict(row) for row in rows])
+
+        except OperationalError as oe:
+            logger.error(f"🚨 Database connection error: {oe!s}")
+            raise RuntimeError("Database connection error") from oe
+        except Exception as e:
+            logger.error(f"❌ Failed to fetch investor leads: {e!s}")
+            raise
+
+    def _validate_investors(self, raw_data: list[dict[str, Any]]) -> list[InvestorMatchResult]:
+        """Convert raw data to validated match results."""
+        validated: list[InvestorMatchResult] = []
+        for idx, item in enumerate(raw_data):
+            try:
+                similarity = item.get("similarity", 0.0)
+                investor = Investor.model_validate(item)
+                validated.append(InvestorMatchResult(investor=investor, similarity=similarity, raw_data=dict(item)))
+            except Exception as e:
+                logger.error(f"Skipping invalid investor data at index {idx}: {e!s}")
+                logger.debug(f"Problematic data: {item}")
+        return validated
+
     async def generate_reason(
         self, search_prompt: str, investor: Investor, company_context: CompanyContext | None = None
     ) -> str:
-        """Generate match reason using LLM with validated investor and company data.
-
-        Args:
-            search_prompt: The search criteria used to find investors
-            investor: The investor to analyze
-            company_context: Optional company details to enhance the matching analysis
-
-        """
+        """Generate match reason using LLM with validated investor and company data."""
         try:
-            # Build structured prompt from validated investor data
             investor_details = self._format_investor_details(investor)
             company_details = self._format_company_details(company_context) if company_context else ""
 
@@ -135,35 +169,3 @@ class InvestorFinder:
         if not check_size:
             return "N/A"
         return check_size.display or f"{check_size.min}-{check_size.max} {check_size.currency}"
-
-    def get_investor_leads(
-        self, supabase_client: Client, embedding: list[float], threshold: float, limit: int
-    ) -> list[InvestorMatchResult]:
-        """Retrieve and validates investor leads from Supabase."""
-        try:
-            logger.debug(f"Querying Supabase with threshold {threshold}, limit {limit}")
-
-            result = supabase_client.rpc(  # type: ignore
-                "get_investor_leads",
-                {"query_embedding": embedding, "match_threshold": threshold, "match_count": limit},
-            ).execute()
-
-            logger.info(f"🔍 Found {len(result.data)} potential investors")  # type: ignore
-            logger.info(f"🔍 Found {len(result.data)} potential investors")  # type: ignore
-            return self._validate_investors(result.data)  # type: ignore
-        except Exception as e:
-            logger.error(f"❌ Failed to fetch investor leads: {e!s}")
-            raise RuntimeError("Supabase query failed") from e
-
-    def _validate_investors(self, raw_data: list[dict[str, Any]]) -> list[InvestorMatchResult]:
-        """Convert raw data to validated match results."""
-        validated: list[InvestorMatchResult] = []
-        for idx, item in enumerate(raw_data):
-            try:
-                similarity = item.get("similarity", 0.0)
-                investor = Investor.model_validate(item)
-                validated.append(InvestorMatchResult(investor=investor, similarity=similarity, raw_data=item))
-            except Exception as e:
-                logger.error(f"Skipping invalid investor data at index {idx}: {e!s}")
-                logger.debug(f"Problematic data: {item}")
-        return validated

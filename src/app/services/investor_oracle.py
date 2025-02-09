@@ -7,7 +7,6 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from openai import AsyncOpenAI
-from supabase import Client
 
 from app.schemas.investor import InvestorMatchRequest, InvestorMatchResponse
 from app.services.investor_finder import InvestorFinder
@@ -19,19 +18,16 @@ class InvestorOracle:
     def __init__(
         self,
         investor_finder: InvestorFinder,
-        supabase: Client,
         openai_client: AsyncOpenAI,
     ) -> None:
         """Initialize InvestorOracle with required dependencies.
 
         Args:
-            investor_finder: Service for finding matching investors using Pydantic AI
-            supabase: Supabase client for database operations
-            openai_client: OpenAI client for embeddings
+            investor_finder: Service for finding matching investors.
+            openai_client: OpenAI client for embeddings.
 
         """
         self.investor_finder = investor_finder
-        self.supabase = supabase
         self.openai_client = openai_client
 
     async def process_request(
@@ -90,12 +86,9 @@ class InvestorOracle:
                 prompt=request.prompt,
             )
 
-            # Get matching investors using Supabase vector similarity search
-            matches = self.investor_finder.get_investor_leads(
-                supabase_client=self.supabase,
-                embedding=embedding,
-                threshold=request.threshold,
-                limit=request.max_entries,
+            # Get matching investors using vector similarity search
+            matches = await self.investor_finder.get_investor_leads(
+                embedding=embedding, threshold=request.threshold, limit=request.max_entries
             )
 
             # Process and stream each match

@@ -1,0 +1,22 @@
+{
+    "version": "0.2",
+    "language": "en, python",
+    "words": [
+        "dataframe",
+        "dataframes",
+        "iterrows",
+        "kwargs",
+        "numexpr",
+        "Pareo",
+        "strftime",
+        "unpickle",
+        "wildcard"
+    ],
+    "ignorePaths": [
+        "pyproject.toml",
+        "**/venv/**",
+        "**/build/**",
+        "**/.gitignore",
+        "**/__pycache__/**"
+    ]
+}
