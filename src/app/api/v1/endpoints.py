@@ -5,10 +5,14 @@ This module contains all the endpoint handlers for the v1 API.
 It defines the core business logic for handling HTTP requests.
 """
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from loguru import logger
 
 from app.api.dependencies import get_investor_oracle
+from app.core.auth import verify_token
 from app.schemas.investor import InvestorMatchRequest
 from app.schemas.item import Item, ItemCreate
 
@@ -19,7 +23,11 @@ items: list[Item] = []
 
 
 @router.post("/investors/match", tags=["investors"])
-async def match_investors(request: InvestorMatchRequest) -> StreamingResponse:
+async def match_investors(
+    request: Request,
+    investor_request: InvestorMatchRequest,
+    token_data: Annotated[dict[str, Any], Depends(verify_token)],
+) -> StreamingResponse:
     """Stream investor matches based on search criteria.
 
     This endpoint processes an investor match request and streams back results
@@ -27,10 +35,13 @@ async def match_investors(request: InvestorMatchRequest) -> StreamingResponse:
     reasoning for the match.
 
     Args:
-        request: The investor match request containing search criteria
+        request: The raw FastAPI request object.
+        investor_request (InvestorMatchRequest): The investor match request containing search criteria
+        and company context.
+        token_data (dict[str, Any]): The decoded JWT token data containing user information.
 
     Returns:
-        StreamingResponse: Server-sent events stream of investor matches
+        StreamingResponse: Server-sent events stream of investor matches.
 
     Example:
         Request:
@@ -66,8 +77,18 @@ async def match_investors(request: InvestorMatchRequest) -> StreamingResponse:
         ```
 
     """
+    # user = user or Depends(verify_token)
+    body = await request.body()
+    logger.debug(f"Raw request body: {body.decode()}")
+
+    logger.debug("Token data contents:")
+    for key, value in token_data.items():
+        logger.debug(f"  {key}: {value}")
+
+    user_id = token_data.get("sub")
+    logger.debug(f"User ID from token: {user_id}")
     investor_oracle = get_investor_oracle()
-    return await investor_oracle.process_request(request=request)
+    return await investor_oracle.process_request(request=investor_request)
 
 
 @router.get("/items/", response_model=list[Item], tags=["items"])
@@ -145,6 +166,6 @@ async def read_item(item_id: int) -> Item:
         ```
 
     """
-    if item_id < 0 or item_id >= len(items):
+    if item_id <= 0 or item_id > len(items):
         raise HTTPException(status_code=404, detail=f"Item with ID {item_id} not found")
     return items[item_id - 1]
