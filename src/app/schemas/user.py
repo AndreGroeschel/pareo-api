@@ -10,6 +10,24 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class ClerkOAuthLink(BaseModel):
+    """Model for OAuth provider link data.
+
+    Attributes:
+        id: Unique identifier for the OAuth connection
+        type: OAuth provider type (e.g., 'oauth_google')
+
+    """
+
+    id: str
+    type: str
+
+    class Config:
+        """Extra config."""
+
+        extra = "allow"  # Allow additional OAuth provider fields
+
+
 class ClerkEmailVerification(BaseModel):
     """Model for Clerk email verification status.
 
@@ -34,7 +52,7 @@ class ClerkEmailAddress(BaseModel):
         email_address: The actual email address
         id: Unique identifier for this email address
         verification: Email verification details
-        linked_to: List of linked identifiers
+        linked_to: List of linked identifiers or OAuth connections
         object: Type identifier from Clerk
         reserved: Whether this email is reserved
 
@@ -43,7 +61,7 @@ class ClerkEmailAddress(BaseModel):
     email_address: str
     id: str
     verification: ClerkEmailVerification
-    linked_to: list[str] = Field(default_factory=list)
+    linked_to: list[ClerkOAuthLink | str] = Field(default_factory=list)
     object: str
     reserved: bool | None = None
 
@@ -86,7 +104,7 @@ class ClerkWebhookEvent(BaseModel):
     timestamp: int
 
     class Config:
-        """Additional configuration data."""
+        """Extra config."""
 
         extra = "allow"  # Allow additional fields from Clerk
 
