@@ -7,21 +7,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from loguru import logger
 
-from .config import settings
+from app.core.config import settings
 
 security = HTTPBearer()
-
-# CLERK_PEM_PUBLIC_KEY = """
-# -----BEGIN PUBLIC KEY-----
-# MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxFO/ljv1XIlIBvPsbKbW
-# mpG/mxC1yfkjWTwn633B/kIqql2z2PrUyVNgG8sNQYeH2eSXYND9S/Go6igxqHOo
-# soESAIFxweKlpp/M6HzkdnKZgmxXvkaJMNoJVrXgkM/PeKvaiHaFE/9T/hU09d4z
-# UV8AYSG4rRIcD4IxpxlA2OnvvlPhiRdPESHBGOG/V/chfV/zc11wUOlZfj+3TUlg
-# zJ1X0WQdI86mDa+N3a+VGrSu6EjtngWkNm4cUgo2HpKjgHJawF494h45j5MyNlhE
-# 1xEODcNfLXaaI7rCTHJQy4gkMiOpDT9yLDXW8vHlsNtdMXUtbAkvklv4rKcymett
-# wQIDAQAB
-# -----END PUBLIC KEY-----
-# """
 
 
 async def verify_token(credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]) -> dict[str, Any]:
