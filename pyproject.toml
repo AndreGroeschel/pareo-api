@@ -15,7 +15,7 @@ dependencies = [
     "openai>=1.60.1",
     "pydantic-settings>=2.7.1",
     "mypy>=1.14.1",
-    "pydantic>=2.10.6",
+    "pydantic[email]>=2.10.6",
     "fastapi>=0.115.8",
     "uvicorn>=0.34.0",
     "logfire>=3.4.0",
@@ -25,6 +25,7 @@ dependencies = [
     "pandas>=2.2.3",
     "tqdm>=4.67.1",
     "pgvector>=0.3.6",
+    "svix>=1.56.0",
 ]
 
 [dependency-groups]

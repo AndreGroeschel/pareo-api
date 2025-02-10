@@ -6,7 +6,9 @@ into a single router for the v1 API.
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import router as endpoints_router
+from app.api.v1.clerk_user_sync_endpoints import router as clerk_user_sync_router
+from app.api.v1.investor_endpoints import router as investors_router
 
 router = APIRouter()
-router.include_router(endpoints_router)
+router.include_router(investors_router, prefix="/investors")
+router.include_router(clerk_user_sync_router, prefix="/clerk-sync")
