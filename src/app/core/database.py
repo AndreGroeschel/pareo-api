@@ -4,6 +4,7 @@ import contextlib
 from collections.abc import AsyncIterator
 from typing import Any
 
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
@@ -18,7 +19,7 @@ from sqlalchemy.orm import DeclarativeBase
 class Base(DeclarativeBase):
     """Base class for all database models with eager defaults enabled."""
 
-    __mapper_args__: dict[str, Any] = {"eager_defaults": True}  # type: ignore[assignment]  # noqa: RUF012
+    __mapper_args__: dict[str, Any] = {"eager_defaults": True}  # noqa: RUF012
 
 
 class DatabaseSessionManager:
@@ -28,12 +29,11 @@ class DatabaseSessionManager:
         """Initialize the session manager with database host and engine arguments.
 
         Args:
-            host: Database connection URL
-            engine_kwargs: Additional keyword arguments for async engine creation
+            host: Database connection URL.
+            engine_kwargs: Additional keyword arguments for async engine creation.
 
         """
-        engine_kwargs = engine_kwargs or {}
-        self._engine: AsyncEngine | None = create_async_engine(host, **engine_kwargs)
+        self._engine: AsyncEngine | None = create_async_engine(host, **(engine_kwargs or {}))
         self._sessionmaker: async_sessionmaker[AsyncSession] | None = async_sessionmaker(
             bind=self._engine,
             autocommit=False,
@@ -52,7 +52,15 @@ class DatabaseSessionManager:
 
     @contextlib.asynccontextmanager
     async def connect(self) -> AsyncIterator[AsyncConnection]:
-        """Asynchronous context manager for database connection."""
+        """Asynchronous context manager for database connection.
+
+        Yields:
+            AsyncConnection: A connection to the database.
+
+        Raises:
+            SQLAlchemyError: If the database engine is not initialized.
+
+        """
         if self._engine is None:
             raise SQLAlchemyError("DatabaseSessionManager is not initialized")
 
@@ -65,7 +73,15 @@ class DatabaseSessionManager:
 
     @contextlib.asynccontextmanager
     async def session(self) -> AsyncIterator[AsyncSession]:
-        """Asynchronous context manager for database session."""
+        """Asynchronous context manager for database session.
+
+        Yields:
+            AsyncSession: A database session.
+
+        Raises:
+            SQLAlchemyError: If the session maker is not initialized.
+
+        """
         if self._sessionmaker is None:
             raise SQLAlchemyError("DatabaseSessionManager is not initialized")
 
@@ -77,3 +93,17 @@ class DatabaseSessionManager:
             raise
         finally:
             await session.close()
+
+    async def health_check(self) -> bool:
+        """Perform a health check on the database connection.
+
+        Returns:
+            bool: True if the database is reachable, False otherwise.
+
+        """
+        try:
+            async with self.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+            return True
+        except SQLAlchemyError:
+            return False

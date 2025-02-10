@@ -1,42 +1,26 @@
-# src/app/services/clerk_user_sync_service.py
 """Service for synchronizing user data from Clerk webhooks."""
 
-from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import text
+from loguru import logger
 
-from app.core.exceptions import UserOperationError
-from app.schemas.user import ClerkWebhookEvent, UserCreate, UserUpdate
-from app.services.database_session_manager import DatabaseSessionManager
+from app.core.exceptions import RepositoryError, UserOperationError
+from app.models.user import ClerkWebhookEvent, UserParams, UserUpdate
+from app.repositories.credit_repository import CreditRepository
+from app.repositories.user_repository import UserRepository
 
 
 class ClerkUserSyncService:
-    """Service for synchronizing user data from Clerk webhook events.
+    """Service for synchronizing user data from Clerk webhook events."""
 
-    This service handles the mirroring of user data from Clerk's authentication service
-    to our local database, including user creation, updates, and deletion events.
-    """
-
-    def __init__(self, db: DatabaseSessionManager) -> None:
-        """Initialize ClerkUserSyncService with a database session manager."""
-        self.db = db
+    def __init__(self, user_repo: UserRepository, credit_repo: CreditRepository) -> None:
+        """Initialize the service with repositories."""
+        self.user_repo = user_repo
+        self.credit_repo = credit_repo
 
     async def sync_new_user(self, webhook_data: ClerkWebhookEvent) -> UUID:
-        """Create a new user record from Clerk webhook data.
-
-        Args:
-            webhook_data: Validated user data received from Clerk webhook
-
-        Returns:
-            UUID of the newly created user
-
-        Raises:
-            UserOperationError: If required Clerk data is missing or sync fails
-
-        """
+        """Create a new user record from Clerk webhook data and initialize credits."""
         try:
-            user_uuid = uuid4()
             user_data = webhook_data.data
 
             if not user_data.email_addresses:
@@ -47,44 +31,57 @@ class ClerkUserSyncService:
                 None,
             )
             if email is None:
-                raise UserOperationError("Primary email address not found in email addresses list")
+                raise UserOperationError("Primary email address not found")
 
-            user_create = UserCreate(
-                id=user_uuid,
+            name = f"{user_data.first_name or ''} {user_data.last_name or ''}".strip()
+
+            # Check if user with this email already exists (including soft-deleted)
+            existing_user = await self.user_repo.get_user_by_email(email)
+
+            if existing_user:
+                # Reactivate the existing user with new Clerk ID
+                await self.user_repo.reactivate_user(existing_user.id, user_data.id, name)
+                return existing_user.id
+
+            # Create new user if no existing user found
+            user_uuid = uuid4()
+            user_params = UserParams(
+                uuid=user_uuid,
                 clerk_id=user_data.id,
                 email=email,
-                name=f"{user_data.first_name or ''} {user_data.last_name or ''}".strip(),
+                name=name,
             )
 
-            async with self.db.session() as session:
-                await session.execute(
-                    text("""
-                        INSERT INTO users (id, clerk_id, email, name)
-                        VALUES (:uuid, :clerk_id, :email, :name)
-                    """),
-                    {
-                        "uuid": user_create.id,
-                        "clerk_id": user_create.clerk_id,
-                        "email": user_create.email,
-                        "name": user_create.name,
-                    },
+            # Create user
+            await self.user_repo.create_user(user_params)
+
+            # Get signup bonus amount from configuration
+            signup_bonus = await self.credit_repo.get_signup_bonus()
+
+            if signup_bonus > 0:
+                # Initialize credit balance
+                await self.credit_repo.create_credit_balance(user_params.uuid, signup_bonus, signup_bonus)
+
+                # Record transaction
+                await self.credit_repo.create_credit_transaction(
+                    user_id=user_params.uuid,
+                    amount=signup_bonus,
+                    balance_after=signup_bonus,
+                    transaction_type="signup_bonus",
+                    description="Welcome bonus credits",
                 )
-                await session.commit()
 
             return user_uuid
+
+        except RepositoryError as e:
+            logger.error(f"Repository error during user creation: {e}")
+            raise UserOperationError(f"Failed to create user due to repository error: {e}") from e
         except Exception as e:
-            raise UserOperationError(f"Failed to create user: {e!s}") from e
+            logger.error(f"Unexpected error during user creation: {e}")
+            raise UserOperationError(f"Failed to create user: {e}") from e
 
-    async def sync_user_updates(self, webhook_data: ClerkWebhookEvent) -> None:
-        """Update existing user record from Clerk webhook data.
-
-        Args:
-            webhook_data: Validated updated user data received from Clerk webhook
-
-        Raises:
-            UserOperationError: If required Clerk data is missing or sync fails
-
-        """
+    async def sync_update_user(self, webhook_data: ClerkWebhookEvent) -> None:
+        """Update an existing user record from Clerk webhook data."""
         try:
             user_data = webhook_data.data
 
@@ -96,50 +93,32 @@ class ClerkUserSyncService:
                 None,
             )
             if email is None:
-                raise UserOperationError("Primary email address not found in email addresses list")
+                raise UserOperationError("Primary email address not found")
 
             user_update = UserUpdate(
                 email=email,
                 name=f"{user_data.first_name or ''} {user_data.last_name or ''}".strip(),
             )
 
-            async with self.db.session() as session:
-                await session.execute(
-                    text("""
-                        UPDATE users
-                        SET email = :email, name = :name
-                        WHERE clerk_id = :clerk_id
-                    """),
-                    {
-                        "clerk_id": user_data.id,
-                        "email": user_update.email,
-                        "name": user_update.name,
-                    },
-                )
-                await session.commit()
+            # Update user
+            await self.user_repo.update_user(user_data.id, user_update)
+
+        except RepositoryError as e:
+            logger.error(f"Repository error during user update: {e}")
+            raise UserOperationError(f"Failed to update user due to repository error: {e}") from e
         except Exception as e:
-            raise UserOperationError(f"Failed to update user: {e!s}") from e
+            logger.error(f"Unexpected error during user update: {e}")
+            raise UserOperationError(f"Failed to update user: {e}") from e
 
-    async def sync_user_deletion(self, clerk_id: str) -> None:
-        """Mark user as deleted when deleted in Clerk.
-
-        Args:
-            clerk_id: Clerk's user ID for the deleted user
-
-        Raises:
-            UserOperationError: If deletion sync fails
-
-        """
+    async def sync_delete_user(self, clerk_id: str) -> None:
+        """Mark a user as deleted when deleted in Clerk."""
         try:
-            async with self.db.session() as session:
-                await session.execute(
-                    text("""
-                        UPDATE users
-                        SET deleted_at = :now
-                        WHERE clerk_id = :clerk_id
-                    """),
-                    {"clerk_id": clerk_id, "now": datetime.now(UTC)},
-                )
-                await session.commit()
+            # Mark user as deleted
+            await self.user_repo.delete_user(clerk_id)
+
+        except RepositoryError as e:
+            logger.error(f"Repository error during user deletion: {e}")
+            raise UserOperationError(f"Failed to delete user due to repository error: {e}") from e
         except Exception as e:
-            raise UserOperationError(f"Failed to delete user: {e!s}") from e
+            logger.error(f"Unexpected error during user deletion: {e}")
+            raise UserOperationError(f"Failed to delete user: {e}") from e

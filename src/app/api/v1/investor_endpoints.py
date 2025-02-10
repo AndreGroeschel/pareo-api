@@ -13,12 +13,8 @@ from loguru import logger
 from app.api.dependencies import get_investor_oracle
 from app.core.auth.auth import verify_token
 from app.schemas.investor import InvestorMatchRequest
-from app.schemas.item import Item
 
 router = APIRouter()
-
-# In-memory storage for items
-items: list[Item] = []
 
 
 @router.post("/match", tags=["investors"])

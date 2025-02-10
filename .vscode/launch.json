@@ -11,6 +11,40 @@
         "PYTHONPATH": "${workspaceFolder}/src"
       },
       "cwd": "${workspaceFolder}/src"
-    }
+    },
+    {
+      "name": "FastAPI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+          "app.main:app",
+          "--reload",
+          "--port",
+          "8000"
+      ],
+      "jinja": true,
+      "justMyCode": true,
+      "env": {
+          "PYTHONPATH": "${workspaceFolder}",
+          "ENVIRONMENT": "development",
+          "DEBUG": "1"
+      }
+  },
+  {
+      "name": "FastAPI Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+          "-v",
+          "tests/",
+          "-s"
+      ],
+      "env": {
+          "PYTHONPATH": "${workspaceFolder}",
+          "ENVIRONMENT": "test"
+      }
+  }
   ]
 }
