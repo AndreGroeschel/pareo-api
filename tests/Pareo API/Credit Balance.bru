@@ -1,0 +1,15 @@
+meta {
+  name: Credit Balance
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:8000/api/v1/credits/balance
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: dvb_2sunMbnktyGjygvpy1F3xncZIiM
+}

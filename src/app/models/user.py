@@ -5,27 +5,45 @@ and user data synchronization between Clerk and our application.
 """
 
 from datetime import datetime
-from uuid import UUID
+from typing import Optional
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
+from sqlalchemy import DateTime, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import Base
+from app.models.credits import CreditBalance, CreditTransaction
 
 
-class ClerkOAuthLink(BaseModel):
-    """Model for OAuth provider link data.
+class User(Base):
+    """User model with Clerk authentication integration.
 
     Attributes:
-        id: Unique identifier for the OAuth connection
-        type: OAuth provider type (e.g., 'oauth_google')
+        id: Primary key UUID
+        name: User's full name
+        clerk_id: Unique identifier from Clerk
+        email: User's primary email address
+        credit_balance: One-to-one relationship with user's credit balance
+        credit_transactions: One-to-many relationship with credit transactions
 
     """
 
-    id: str
-    type: str
+    __tablename__ = "users"
 
-    class Config:
-        """Extra config."""
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(255))
+    clerk_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-        extra = "allow"  # Allow additional OAuth provider fields
+    # Credit system relationships
+    credit_balance: Mapped[Optional["CreditBalance"]] = relationship(
+        "CreditBalance", back_populates="user", uselist=False
+    )
+    credit_transactions: Mapped[list["CreditTransaction"]] = relationship(
+        "CreditTransaction", back_populates="user", passive_deletes=True
+    )
 
 
 class ClerkEmailVerification(BaseModel):
@@ -45,6 +63,13 @@ class ClerkEmailVerification(BaseModel):
     expire_at: datetime | None = None
 
 
+class LinkedToData(BaseModel):
+    """Model for linked authentication data."""
+
+    id: str
+    type: str
+
+
 class ClerkEmailAddress(BaseModel):
     """Model for Clerk email address data.
 
@@ -52,7 +77,7 @@ class ClerkEmailAddress(BaseModel):
         email_address: The actual email address
         id: Unique identifier for this email address
         verification: Email verification details
-        linked_to: List of linked identifiers or OAuth connections
+        linked_to: List of linked identifiers
         object: Type identifier from Clerk
         reserved: Whether this email is reserved
 
@@ -61,7 +86,7 @@ class ClerkEmailAddress(BaseModel):
     email_address: str
     id: str
     verification: ClerkEmailVerification
-    linked_to: list[ClerkOAuthLink | str] = Field(default_factory=list)
+    linked_to: list[LinkedToData] = Field(default_factory=list)
     object: str
     reserved: bool | None = None
 
@@ -104,7 +129,7 @@ class ClerkWebhookEvent(BaseModel):
     timestamp: int
 
     class Config:
-        """Extra config."""
+        """Additional configuration data."""
 
         extra = "allow"  # Allow additional fields from Clerk
 
@@ -150,3 +175,12 @@ class WebhookResponse(BaseModel):
 
     status: str
     user_id: str | None = None
+
+
+class UserParams(BaseModel):
+    """Type-safe parameters for user creation."""
+
+    uuid: UUID
+    clerk_id: str
+    email: str
+    name: str

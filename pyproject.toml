@@ -26,6 +26,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "pgvector>=0.3.6",
     "svix>=1.56.0",
+    "alembic>=1.14.1",
 ]
 
 [dependency-groups]

@@ -6,12 +6,18 @@ to be efficient through caching and proper resource management.
 """
 
 from functools import lru_cache
+from typing import Annotated
 
+from fastapi import Depends
 from openai import AsyncOpenAI
 from pydantic_ai.models.openai import OpenAIModel
 
 from app.core.config import get_settings
-from app.services.database_session_manager import DatabaseSessionManager
+from app.core.database import DatabaseSessionManager
+from app.repositories.credit_repository import CreditRepository
+from app.repositories.user_repository import UserRepository
+from app.services.clerk_user_sync_service import ClerkUserSyncService
+from app.services.credit_service import CreditService
 from app.services.investor_finder import InvestorFinder
 from app.services.investor_oracle import InvestorOracle
 
@@ -47,6 +53,39 @@ def get_db_session_manager() -> DatabaseSessionManager:
     """Centralized session manager instance."""
     settings = get_settings()
     return DatabaseSessionManager(settings.database_url, {"pool_pre_ping": True, "pool_size": 20, "max_overflow": 10})
+
+
+@lru_cache
+def get_user_repository(
+    db_session_manager: Annotated[DatabaseSessionManager, Depends(get_db_session_manager)],
+) -> UserRepository:
+    """Dependency provider for the UserRepository."""
+    return UserRepository(db_session_manager)
+
+
+@lru_cache
+def get_credit_repository(
+    db_session_manager: Annotated[DatabaseSessionManager, Depends(get_db_session_manager)],
+) -> CreditRepository:
+    """Dependency provider for the CreditRepository."""
+    return CreditRepository(db_session_manager)
+
+
+@lru_cache
+def get_credit_service(
+    credit_repo: Annotated[CreditRepository, Depends(get_credit_repository)],
+) -> CreditService:
+    """Dependency provider for the CreditService."""
+    return CreditService(credit_repo)
+
+
+@lru_cache
+def get_clerk_sync_service(
+    user_repo: Annotated[UserRepository, Depends(get_user_repository)],
+    credit_repo: Annotated[CreditRepository, Depends(get_credit_repository)],
+) -> ClerkUserSyncService:
+    """Dependency provider for the CreditRepository."""
+    return ClerkUserSyncService(user_repo, credit_repo)
 
 
 @lru_cache

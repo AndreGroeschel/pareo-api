@@ -10,8 +10,8 @@ from pydantic_ai.models.openai import OpenAIModel
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
+from app.core.database import DatabaseSessionManager
 from app.schemas.investor import CheckSize, CompanyContext, Investor
-from app.services.database_session_manager import DatabaseSessionManager
 
 
 class InvestorMatchResult(BaseModel):
