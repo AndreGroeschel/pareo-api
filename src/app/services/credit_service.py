@@ -1,12 +1,13 @@
 """Service for credits."""
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from loguru import logger
 
 from app.core.exceptions import CreditOperationError, RepositoryError
 from app.repositories.credit_repository import CreditRepository
-from app.schemas.credits import CreditBalanceResponse
+from app.schemas.credits import CreditBalanceResponse, CreditPackageResponse
 
 
 class CreditService:
@@ -30,6 +31,45 @@ class CreditService:
         except RepositoryError as e:
             logger.error(f"Repository error while fetching credit balance: {e}")
             raise CreditOperationError(f"Failed to fetch credit balance: {e}") from e
+
+    async def get_credit_packages(self, currency: str | None = None) -> Sequence[CreditPackageResponse]:
+        """Get all active credit packages.
+
+        Args:
+            currency: Optional currency code to filter packages by (e.g. 'usd', 'eur')
+
+        Returns:
+            List of active credit packages.
+
+        Raises:
+            CreditOperationError: If there's an error fetching the packages.
+
+        """
+        try:
+            packages = await self.credit_repo.get_active_packages(currency)
+            return [CreditPackageResponse.model_validate(package) for package in packages]
+        except RepositoryError as e:
+            logger.error(f"Repository error while fetching credit packages: {e}")
+            raise CreditOperationError(f"Failed to fetch credit packages: {e}") from e
         except Exception as e:
-            logger.error(f"Unexpected error while fetching credit balance: {e}")
-            raise CreditOperationError(f"Failed to fetch credit balance: {e}") from e
+            logger.error(f"Unexpected error while fetching credit packages: {e}")
+            raise CreditOperationError(f"Failed to fetch credit packages: {e}") from e
+
+    async def get_available_currencies(self) -> list[str]:
+        """Get list of currencies that have active packages.
+
+        Returns:
+            List of currency codes (e.g. ['usd', 'eur'])
+
+        Raises:
+            CreditOperationError: If there's an error fetching the currencies.
+
+        """
+        try:
+            return await self.credit_repo.get_available_currencies()
+        except RepositoryError as e:
+            logger.error(f"Repository error while fetching credit packages: {e}")
+            raise CreditOperationError(f"Failed to fetch credit packages: {e}") from e
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching credit packages: {e}")
+            raise CreditOperationError(f"Failed to fetch credit packages: {e}") from e

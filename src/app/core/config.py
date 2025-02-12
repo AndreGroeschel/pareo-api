@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     reasoning_model: str = Field(default=...)
     clerk_pem_public_key: str = Field(default=...)
     clerk_webhook_secret: str = Field(default=...)
+    stripe_secret_key: str = Field(default=...)
+    stripe_webhook_secret: str = Field(default=...)
 
     @field_validator("allowed_hosts")
     @classmethod

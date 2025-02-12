@@ -34,6 +34,7 @@ class CreditPackage(Base):
     name: Mapped[str] = mapped_column(String(255))
     credits: Mapped[int] = mapped_column(Integer)
     price_cents: Mapped[int] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(3))
     tier: Mapped[str] = mapped_column(String(50))
     savings_percentage: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool | None] = mapped_column(Boolean, default=True)
