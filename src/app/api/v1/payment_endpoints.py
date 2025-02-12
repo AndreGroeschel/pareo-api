@@ -1,0 +1,73 @@
+"""Payment-related API endpoints."""
+
+from typing import Annotated, cast
+
+import stripe
+import stripe.error
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.api.dependencies import get_db_session_manager
+from app.core.auth.auth import get_current_user
+from app.core.config import settings
+from app.core.database import DatabaseSessionManager
+from app.models.user import User
+from app.repositories.credit_repository import CreditRepository
+from app.schemas.payments import CreatePaymentIntentRequest, PaymentIntentResponse
+from app.services.payment_service import PaymentService, StripeEvent
+
+router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+@router.post("/create-intent", response_model=PaymentIntentResponse)
+async def create_payment_intent(
+    request: CreatePaymentIntentRequest,
+    db_session_manager: Annotated[DatabaseSessionManager, Depends(get_db_session_manager)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> PaymentIntentResponse:
+    """Create a payment intent for purchasing credits."""
+    credit_repository = CreditRepository(db_session_manager)
+    payment_service = PaymentService(credit_repository)
+
+    return await payment_service.create_payment_intent(
+        package_id=request.package_id,
+        user_id=current_user.id,
+    )
+
+
+@router.post("/webhook")
+async def stripe_webhook(
+    request: Request,
+    db_session_manager: Annotated[DatabaseSessionManager, Depends(get_db_session_manager)],
+) -> dict[str, bool]:
+    """Handle Stripe webhook events."""
+    if not settings.stripe_webhook_secret:
+        raise HTTPException(status_code=500, detail="Stripe webhook secret not configured")
+
+    # Get the webhook signature
+    signature = request.headers.get("stripe-signature")
+    if not signature:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+
+    try:
+        # Get the raw request body as bytes
+        body = await request.body()
+
+        # Verify webhook signature and construct the event
+        raw_event = stripe.Webhook.construct_event(  # type: ignore
+            payload=body.decode("utf-8"),  # Stripe expects the payload as a string
+            sig_header=signature,
+            secret=settings.stripe_webhook_secret,
+        )
+        event = cast(StripeEvent, raw_event)
+
+        # Handle the event
+        credit_repository = CreditRepository(db_session_manager)
+        payment_service = PaymentService(credit_repository)
+        await payment_service.handle_webhook_event(event)
+
+        return {"received": True}
+
+    except stripe.error:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
