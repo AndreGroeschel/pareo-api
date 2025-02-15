@@ -28,6 +28,7 @@ dependencies = [
     "svix>=1.56.0",
     "alembic>=1.14.1",
     "stripe>=11.5.0",
+    "httpx>=0.27.2",
 ]
 
 [dependency-groups]
