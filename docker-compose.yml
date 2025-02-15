@@ -1,24 +1,60 @@
 services:
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  db:
+    image: pgvector/pgvector:0.8.0-pg17
+    container_name: pareo_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pareo
+      POSTGRES_PASSWORD: pareo123
+      POSTGRES_DB: pareo_dev
+      # Optimize PostgreSQL for development
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+      POSTGRES_HOST_AUTH_METHOD: "md5"
     ports:
-      - "8000:8000"
-    expose:
-      - "8000"
-    env_file:
-      - .env
+      - "5432:5432"
     volumes:
-      - ./src:/app/src
-      - .env:/app/.env
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-    develop:
-      watch:
-        - action: sync
-          path: ./src
-          target: /app/src
-          ignore:
-            - "**/__pycache__/"
-        - action: rebuild
-          path: pyproject.toml
+      # Persistent data storage
+      - postgres_data:/var/lib/postgresql/data
+      # Mount directory for initialization scripts
+      - ./database/scripts:/docker-entrypoint-initdb.d
+      # Mount directory for backups
+      - ./database/backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pareo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: [
+      "postgres",
+      "-c", "shared_preload_libraries=vector",
+      # Development-friendly configurations
+      "-c", "max_connections=100",
+      "-c", "shared_buffers=128MB",
+      "-c", "work_mem=32MB",
+      "-c", "maintenance_work_mem=128MB",
+      "-c", "effective_cache_size=512MB",
+      "-c", "client_min_messages=notice"
+    ]
+    shm_size: '256mb'  # Shared memory size for better performance
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pareo_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pareo.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+    name: pareo_postgres_data
+  pgadmin_data:
+    name: pareo_pgadmin_data

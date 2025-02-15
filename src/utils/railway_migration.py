@@ -283,11 +283,11 @@ def main():
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     )
 
-    SUPABASE_URL = "your_connection_string"
-    RAILWAY_URL = "your_connection_string"
+    SOURCE_DB_URL = ""
+    TARGET_DB_URL = "postgresql://pareo:pareo123@localhost:5432/pareo_dev"
 
     try:
-        migrator = DatabaseMigrator(source_url=SUPABASE_URL, target_url=RAILWAY_URL)
+        migrator = DatabaseMigrator(source_url=SOURCE_DB_URL, target_url=TARGET_DB_URL)
         migrator.migrate_all()
         logger.success("🎉 Migration completed successfully!")
     except Exception as e:

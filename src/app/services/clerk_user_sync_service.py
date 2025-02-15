@@ -2,10 +2,12 @@
 
 from uuid import UUID, uuid4
 
+import httpx
 from loguru import logger
 
+from app.core.config import settings
 from app.core.exceptions import RepositoryError, UserOperationError
-from app.models.user import ClerkWebhookEvent, UserParams, UserUpdate
+from app.models.user import ClerkUserData, ClerkWebhookEvent, UserParams, UserUpdate
 from app.repositories.credit_repository import CreditRepository
 from app.repositories.user_repository import UserRepository
 
@@ -17,6 +19,40 @@ class ClerkUserSyncService:
         """Initialize the service with repositories."""
         self.user_repo = user_repo
         self.credit_repo = credit_repo
+        self.clerk_base_url = settings.clerk_base_url
+
+    async def get_clerk_user(self, clerk_id: str) -> ClerkUserData:
+        """Fetch user data from Clerk API.
+
+        Args:
+            clerk_id: The Clerk user ID
+
+        Returns:
+            ClerkUserData: The user data from Clerk
+
+        Raises:
+            UserOperationError: If the API request fails
+
+        """
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.clerk_base_url}/users/{clerk_id}",
+                    headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
+                )
+                response.raise_for_status()
+                user_data = response.json()
+
+                return ClerkUserData(
+                    id=user_data["id"],
+                    email_addresses=user_data["email_addresses"],
+                    first_name=user_data.get("first_name"),
+                    last_name=user_data.get("last_name"),
+                    primary_email_address_id=user_data["primary_email_address_id"],
+                )
+        except Exception as e:
+            logger.error(f"Failed to fetch user data from Clerk: {e}")
+            raise UserOperationError(f"Failed to fetch user data from Clerk: {e}") from e
 
     async def sync_new_user(self, webhook_data: ClerkWebhookEvent) -> UUID:
         """Create a new user record from Clerk webhook data and initialize credits."""
