@@ -14,12 +14,15 @@ from pydantic_ai.models.openai import OpenAIModel
 
 from app.core.config import get_settings
 from app.core.database import DatabaseSessionManager
+from app.repositories.billing_repository import BillingRepository
 from app.repositories.credit_repository import CreditRepository
 from app.repositories.user_repository import UserRepository
+from app.services.billing_service import BillingService
 from app.services.clerk_user_sync_service import ClerkUserSyncService
 from app.services.credit_service import CreditService
 from app.services.investor_finder import InvestorFinder
 from app.services.investor_oracle import InvestorOracle
+from app.services.payment_service import PaymentService
 
 
 @lru_cache
@@ -77,6 +80,31 @@ def get_credit_service(
 ) -> CreditService:
     """Dependency provider for the CreditService."""
     return CreditService(credit_repo)
+
+
+@lru_cache
+def get_billing_repository(
+    db_session_manager: Annotated[DatabaseSessionManager, Depends(get_db_session_manager)],
+) -> BillingRepository:
+    """Dependency provider for the BillingRepository."""
+    return BillingRepository(db_session_manager)
+
+
+@lru_cache
+def get_billing_service(
+    billing_repo: Annotated[BillingRepository, Depends(get_billing_repository)],
+) -> BillingService:
+    """Dependency provider for the BillingService."""
+    return BillingService(billing_repo)
+
+
+@lru_cache
+def get_payment_service(
+    credit_repo: Annotated[CreditRepository, Depends(get_credit_repository)],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
+) -> PaymentService:
+    """Dependency provider for the PaymentService."""
+    return PaymentService(credit_repo, billing_service)
 
 
 @lru_cache

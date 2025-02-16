@@ -7,7 +7,10 @@
         "iterrows",
         "kwargs",
         "numexpr",
+        "ondelete",
+        "onupdate",
         "Pareo",
+        "selectinload",
         "strftime",
         "Svix",
         "unpickle",
@@ -18,6 +21,7 @@
         "**/venv/**",
         "**/build/**",
         "**/.gitignore",
+        "docker-compose.yml",
         "**/__pycache__/**"
     ]
 }
