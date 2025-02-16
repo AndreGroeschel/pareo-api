@@ -6,12 +6,10 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from loguru import logger
 
-from app.api.dependencies import get_db_session_manager
+from app.api.dependencies import get_payment_service
 from app.core.auth.auth import get_current_user
 from app.core.config import settings
-from app.core.database import DatabaseSessionManager
 from app.models.user import User
-from app.repositories.credit_repository import CreditRepository
 from app.schemas.payments import CreatePaymentIntentRequest, PaymentIntentResponse
 from app.services.payment_service import PaymentService, StripeEvent
 
@@ -21,12 +19,10 @@ router = APIRouter()
 @router.post("/create-intent", response_model=PaymentIntentResponse)
 async def create_payment_intent(
     request: CreatePaymentIntentRequest,
-    db_session_manager: Annotated[DatabaseSessionManager, Depends(get_db_session_manager)],
     current_user: Annotated[User, Depends(get_current_user)],
+    payment_service: Annotated[PaymentService, Depends(get_payment_service)],
 ) -> PaymentIntentResponse:
     """Create a payment intent for purchasing credits."""
-    credit_repository = CreditRepository(db_session_manager)
-    payment_service = PaymentService(credit_repository)
     logger.info("Creating intent")
     return await payment_service.create_payment_intent(
         package_id=request.package_id,
@@ -37,7 +33,7 @@ async def create_payment_intent(
 @router.post("/webhook")
 async def stripe_webhook(
     request: Request,
-    db_session_manager: Annotated[DatabaseSessionManager, Depends(get_db_session_manager)],
+    payment_service: Annotated[PaymentService, Depends(get_payment_service)],
 ) -> dict[str, bool]:
     """Handle Stripe webhook events."""
     if not settings.stripe_webhook_secret:
@@ -62,8 +58,6 @@ async def stripe_webhook(
         event = cast(StripeEvent, raw_event)
 
         # Handle the event
-        credit_repository = CreditRepository(db_session_manager)
-        payment_service = PaymentService(credit_repository)
         await payment_service.handle_webhook_event(event)
 
         return {"received": True}

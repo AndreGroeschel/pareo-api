@@ -5,7 +5,7 @@ and user data synchronization between Clerk and our application.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -13,7 +13,10 @@ from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
-from app.models.credits import CreditBalance, CreditTransaction
+
+if TYPE_CHECKING:
+    from app.models.billing_info import BillingInfo
+    from app.models.credits import CreditBalance, CreditTransaction, Invoice
 
 
 class User(Base):
@@ -44,6 +47,8 @@ class User(Base):
     credit_transactions: Mapped[list["CreditTransaction"]] = relationship(
         "CreditTransaction", back_populates="user", passive_deletes=True
     )
+    invoices: Mapped[list["Invoice"]] = relationship("Invoice", back_populates="user", passive_deletes=True)
+    billing_info: Mapped[Optional["BillingInfo"]] = relationship("BillingInfo", back_populates="user", uselist=False)
 
 
 class ClerkEmailVerification(BaseModel):

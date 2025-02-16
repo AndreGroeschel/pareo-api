@@ -1,6 +1,7 @@
 """Models for the credit system."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -9,6 +10,15 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+from .user import User
+
+
+class TransactionType(str, Enum):
+    """Enum for credit transaction types."""
+
+    PURCHASE = "purchase"
+    USAGE = "usage"
+    SIGNUP_BONUS = "signup_bonus"
 
 
 class FeatureCost(Base):
@@ -49,13 +59,14 @@ class CreditTransaction(Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     amount: Mapped[int] = mapped_column(Integer)
     balance_after: Mapped[int] = mapped_column(Integer)
-    transaction_type: Mapped[str] = mapped_column(String(50))
+    transaction_type: Mapped[TransactionType] = mapped_column(String(50))
     feature_key: Mapped[str | None] = mapped_column(ForeignKey("feature_costs.feature_key", ondelete="SET NULL"))
     description: Mapped[str | None] = mapped_column(Text)
     transaction_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     user = relationship("User", back_populates="credit_transactions")
     feature = relationship("FeatureCost")
+    invoice = relationship("Invoice", back_populates="transaction", uselist=False)
 
 
 class CreditBalance(Base):
@@ -83,3 +94,23 @@ class CreditConfiguration(Base):
     value: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Invoice(Base):
+    """Model for credit purchase invoices.
+
+    This model stores minimal information needed to retrieve and verify ownership of Stripe invoices.
+    The actual invoice data and PDF are retrieved from Stripe when needed.
+    """
+
+    __tablename__ = "credit_invoices"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    transaction_id: Mapped[UUID] = mapped_column(ForeignKey("credit_transactions.id", ondelete="CASCADE"))
+    stripe_invoice_id: Mapped[str] = mapped_column(String(255), unique=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=func.now())
+
+    # Relationships
+    user: Mapped["User"] = relationship("User", back_populates="invoices")
+    transaction: Mapped["CreditTransaction"] = relationship("CreditTransaction", back_populates="invoice")

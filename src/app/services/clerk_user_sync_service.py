@@ -7,6 +7,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.exceptions import RepositoryError, UserOperationError
+from app.models.credits import TransactionType
 from app.models.user import ClerkUserData, ClerkWebhookEvent, UserParams, UserUpdate
 from app.repositories.credit_repository import CreditRepository
 from app.repositories.user_repository import UserRepository
@@ -103,7 +104,7 @@ class ClerkUserSyncService:
                     user_id=user_params.uuid,
                     amount=signup_bonus,
                     balance_after=signup_bonus,
-                    transaction_type="signup_bonus",
+                    transaction_type=TransactionType.SIGNUP_BONUS,
                     description="Welcome bonus credits",
                 )
 

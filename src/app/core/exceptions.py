@@ -110,6 +110,12 @@ class ServiceError(Exception):
 
 
 class CreditOperationError(Exception):
-    """Exception raised when a credit-related operation fails."""
+    """Raised when a credit operation fails."""
+
+    pass
+
+
+class BillingOperationError(Exception):
+    """Raised when a billing operation fails."""
 
     pass
